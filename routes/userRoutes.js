@@ -8,13 +8,36 @@ const { matchUser } = require('../controllers/matchController');
 // ✅ Route 1: Register user
 router.post('/register', async (req, res) => {
   try {
+    const body = req.body;
+    console.log('📥 Incoming registration:', body);
+
+    // ✅ Validate required fields
+    const requiredFields = [
+      'introvert_extrovert',
+      'conflict_style',
+      'relationship_goal',
+      'love_language',
+      'attachment_style'
+    ];
+    const missingFields = requiredFields.filter(field => !body[field]);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        error: `Missing required fields: ${missingFields.join(', ')}`
+      });
+    }
+
+    // ✅ Create new user
     const newUser = new User({
-      compatibilityAnswers: req.body
+      compatibilityAnswers: body
     });
+
     const savedUser = await newUser.save();
     res.status(201).json(savedUser);
+
   } catch (err) {
-    res.status(500).json({ error: 'Failed to create user' });
+    console.error('❌ Failed to create user:', err);
+    res.status(500).json({ error: 'Failed to create user', details: err.message });
   }
 });
 
@@ -33,12 +56,12 @@ router.post('/unpin/:id', async (req, res) => {
 
     const now = new Date();
 
-    // Update the user who unpinned (reflection freeze)
+    // Update the user who unpinned
     user.state = 'frozen';
     user.freezeUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hrs
     user.pinStatus = 'unpinned';
 
-    // Update the matched partner
+    // Update matched partner
     const other = await User.findById(user.match._id);
     other.state = 'available';
     other.match = null;
@@ -59,7 +82,7 @@ router.post('/unpin/:id', async (req, res) => {
   }
 });
 
-// ✅ Route 4: Get user by ID (for freezeUntil, onboarding answers)
+// ✅ Route 4: Get user by ID (for countdown + feedback)
 router.get('/:id', async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
